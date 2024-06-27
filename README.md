@@ -9,8 +9,9 @@ A plugin for deploying open-source artifacts to Maven via the Sonatype Central p
 1. Add the following to your `project/plugins.sbt` file (or equivalent):
 
 ```sbt
-addSbtPlugin("com.lumidion"   % "sbt-sonatype-central"  % "0.1.0")
-addSbtPlugin("com.github.sbt" % "sbt-pgp"               % "2.2.1")
+addSbtPlugin("com.lumidion"   % "sbt-sonatype-central"  % "0.1.0") //For deploying your lib to Sonatype Central
+addSbtPlugin("com.github.sbt" % "sbt-pgp"               % "2.2.1") //For signing the lib before it is deployed
+addSbtPlugin("com.github.sbt" % "sbt-git"               % "2.0.1") //For adding source control information to your package.
 ```
 
 2. Make sure that your version is not a snapshot (Sonatype Central does not support publishing snapshot versions).
