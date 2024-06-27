@@ -21,7 +21,11 @@ object SonatypeCentral extends AutoPlugin {
     },
     sonatypeCentralDeploymentName := DeploymentName.fromArtifact(organization.value, name.value, version.value).unapply,
     sonatypeCentralPublishToBundle := {
-      Some(Resolver.file("sonatype-central-local-bundle", sonatypeCentralBundleDirectory.value))
+      if (version.value.endsWith("-SNAPSHOT")) {
+        None
+      } else {
+        Some(Resolver.file("sonatype-central-local-bundle", sonatypeCentralBundleDirectory.value))
+      }
     },
     sonatypeCentralBundleClean := {
       IO.delete(sonatypeCentralBundleDirectory.value)

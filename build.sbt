@@ -13,7 +13,17 @@ publishTo := sonatypeCentralPublishToBundle.value
 
 inThisBuild {
   Seq(
-    scalaVersion := versions.scala
+    scalaVersion := versions.scala,
+    homepage     := Some(url("https://github.com/lumidion/sonatype-central-client")),
+    licenses     := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+    developers := List(
+      Developer(
+        id = "andrapyre",
+        name = "David Doyle",
+        email = "david@lumidion.com",
+        url = url("https://www.lumidion.com/about")
+      )
+    ),
   )
 }
 
@@ -24,6 +34,7 @@ lazy val root = (project in file("."))
     name         := "sbt-sonatype-central",
     sbtPlugin    := true,
     scalacOptions ++= Seq("-Ywarn-unused-import", "-Xfatal-warnings", "-deprecation"),
+    sbtPluginPublishLegacyMavenStyle := false,
     libraryDependencies ++= Seq(
       "com.lumidion"                  %% "sonatype-central-client-sttp-core" % versions.sonatypeCentralClient,
       "com.lumidion"                  %% "sonatype-central-client-zio-json"  % versions.sonatypeCentralClient,
