@@ -6,7 +6,6 @@ addCommandAlias("fmtCheck", "all root/scalafmtSbtCheck root/scalafmtCheckAll")
 val versions = new {
   val scala                 = "2.12.19"
   val sonatypeCentralClient = "0.2.0"
-  val sttp                  = "4.0.0-M11"
 }
 
 publishTo := sonatypeCentralPublishToBundle.value
@@ -36,9 +35,6 @@ lazy val root = (project in file("."))
     scalacOptions ++= Seq("-Ywarn-unused-import", "-Xfatal-warnings", "-deprecation"),
     sbtPluginPublishLegacyMavenStyle := false,
     libraryDependencies ++= Seq(
-      "com.lumidion"                  %% "sonatype-central-client-sttp-core" % versions.sonatypeCentralClient,
-      "com.lumidion"                  %% "sonatype-central-client-zio-json"  % versions.sonatypeCentralClient,
-      "com.softwaremill.sttp.client4" %% "slf4j-backend"                     % versions.sttp,
-      "com.softwaremill.sttp.client4" %% "zio-json"                          % versions.sttp
+      "com.lumidion"                  %% "sonatype-central-client-requests" % versions.sonatypeCentralClient
     )
   )

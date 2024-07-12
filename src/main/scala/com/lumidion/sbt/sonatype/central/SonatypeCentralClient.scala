@@ -3,30 +3,22 @@ package com.lumidion.sbt.sonatype.central
 import com.lumidion.sbt.sonatype.central.error.{SonatypeCentralClientError, SonatypeCentralPluginError}
 import com.lumidion.sbt.sonatype.central.utils.Extensions.*
 import com.lumidion.sonatype.central.client.core.*
-import com.lumidion.sonatype.central.client.core.DeploymentState.PUBLISHED
-import com.lumidion.sonatype.central.client.sttp.core.SyncSonatypeClient
-import com.lumidion.sonatype.central.client.zio.json.decoders.*
 
 import sbt.librarymanagement.ivy.Credentials
 import sbt.util.Logger
 
-import sttp.client4.{HttpError, ResponseException}
-import sttp.client4.httpurlconnection.HttpURLConnectionBackend
-import sttp.client4.logging.slf4j.Slf4jLoggingBackend
-import sttp.client4.logging.LoggingOptions
-import sttp.client4.ziojson.asJson
-import sttp.model.StatusCode
-
 import java.io.File
 import scala.math.pow
 import scala.util.Try
+import com.lumidion.sonatype.central.client.requests.SyncSonatypeClient
+import com.lumidion.sonatype.central.client.core.DeploymentState.PUBLISHED
 
 private[central] class SonatypeCentralClient(
     client: SyncSonatypeClient
 )(implicit val logger: Logger) {
 
   private def retryRequest[A, E](
-      request: => Either[ResponseException[String, E], A],
+      request: => Either[Throwable, A],
       errorContext: String,
       retriesLeft: Int,
       retriesAttempted: Int = 0
@@ -36,13 +28,6 @@ private[central] class SonatypeCentralClient(
         SonatypeCentralClientError(new Exception(s"$errorContext. ${err.getMessage}"))
       }
       finalResponse <- response match {
-        case Left(HttpError(message, code))
-            if (code == StatusCode.Forbidden) || (code == StatusCode.Unauthorized) || (code == StatusCode.BadRequest) =>
-          Left(
-            SonatypeCentralClientError(
-              new Exception(s"$errorContext. Status code: ${code.code}. Message Received: $message")
-            )
-          )
         case Left(ex) =>
           if (retriesLeft > 0) {
             val exponent                   = pow(5, retriesAttempted).toInt
@@ -57,7 +42,9 @@ private[central] class SonatypeCentralClient(
             )
             retryRequest(request, errorContext, retriesLeft - 1, retriesAttempted + 1)
           } else {
-            Left(SonatypeCentralClientError(ex))
+            ex match {
+              case ex: Exception => Left(SonatypeCentralClientError(ex))
+            }
           }
         case Right(res) => Right(res)
       }
@@ -71,7 +58,7 @@ private[central] class SonatypeCentralClient(
     logger.info(s"Uploading bundle ${localBundlePath.getPath} to Sonatype Central")
 
     retryRequest(
-      client.uploadBundle(localBundlePath, deploymentName, publishingType).body,
+      Try(client.uploadBundleFromFile(localBundlePath, deploymentName, publishingType)).toEither,
       "Error uploading bundle to Sonatype Central",
       60
     )
@@ -84,7 +71,7 @@ private[central] class SonatypeCentralClient(
 
     for {
       response <- retryRequest(
-        client.checkStatus(deploymentId)(asJson[CheckStatusResponse]).body,
+        Try(client.checkStatus(deploymentId)).toEither,
         "Error checking deployment status",
         10
       )
@@ -125,11 +112,8 @@ private[central] object SonatypeCentralClient {
           )
         }
         .map(directCredentials => SonatypeCredentials(directCredentials.userName, directCredentials.passwd))
-      backend = Slf4jLoggingBackend(HttpURLConnectionBackend())
       client = new SyncSonatypeClient(
-        sonatypeCredentials,
-        backend,
-        Some(LoggingOptions(logRequestBody = Some(true), logResponseBody = Some(true)))
+        sonatypeCredentials
       )
     } yield new SonatypeCentralClient(client)
 }
