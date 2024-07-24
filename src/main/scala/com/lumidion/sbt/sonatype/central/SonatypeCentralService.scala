@@ -9,6 +9,7 @@ import sbt.util.Logger
 import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.file.{Files, Path}
 import java.util.zip.{ZipEntry, ZipOutputStream}
+import scala.reflect.io.Directory
 import scala.util.Try
 
 private[central] class SonatypeCentralService(client: SonatypeCentralClient)(implicit val logger: Logger) {
@@ -17,27 +18,35 @@ private[central] class SonatypeCentralService(client: SonatypeCentralClient)(imp
       localBundlePath: File,
       deploymentName: DeploymentName,
       publishingType: PublishingType
-  ): Either[SonatypeCentralPluginError, Unit] = for {
-    bundleZipDirectory <- Try(Files.createDirectory(Path.of(s"${localBundlePath.getPath}-bundle"))).toEither.leftMap {
-      err =>
+  ): Either[SonatypeCentralPluginError, Unit] = {
+    val finalBundlePath = Path.of(s"${localBundlePath.getPath}-bundle")
+    val bundleDirectory = Directory(finalBundlePath.toFile)
+    for {
+      _ <- Try(bundleDirectory.deleteRecursively()).toEither.leftMap { err =>
+        SonatypeCentralBundlingError(
+          new Exception(s"Error deleting old bundle zip directory while preparing new bundle. ${err.getMessage}")
+        )
+      }
+      bundleZipDirectory <- Try(Files.createDirectory(finalBundlePath)).toEither.leftMap { err =>
         SonatypeCentralBundlingError(new Exception(s"Error creating bundle zip directory. ${err.getMessage}"))
-    }
-    zipFile <- Try(zipDirectory(localBundlePath, bundleZipDirectory)).toEither.leftMap { err =>
-      SonatypeCentralBundlingError(new Exception(err.getMessage))
-    }
-    deploymentId <- client.uploadBundle(zipFile, deploymentName, Some(publishingType))
-    _ = logger.info(s"Checking if deployment succeeded for deployment id: ${deploymentId.unapply}...")
-    didDeploySucceed <- client.didDeploySucceed(deploymentId, publishingType == PublishingType.AUTOMATIC)
-    _ <- Either.cond(
-      didDeploySucceed,
-      (),
-      SonatypeCentralBundlingError(
-        new Exception(
-          s"Deployment failed. Deployment id: ${deploymentId.unapply}. Deployment name: ${deploymentName.unapply}"
+      }
+      zipFile <- Try(zipDirectory(localBundlePath, bundleZipDirectory)).toEither.leftMap { err =>
+        SonatypeCentralBundlingError(new Exception(err.getMessage))
+      }
+      deploymentId <- client.uploadBundle(zipFile, deploymentName, Some(publishingType))
+      _ = logger.info(s"Checking if deployment succeeded for deployment id: ${deploymentId.unapply}...")
+      didDeploySucceed <- client.didDeploySucceed(deploymentId, publishingType == PublishingType.AUTOMATIC)
+      _ <- Either.cond(
+        didDeploySucceed,
+        (),
+        SonatypeCentralBundlingError(
+          new Exception(
+            s"Deployment failed. Deployment id: ${deploymentId.unapply}. Deployment name: ${deploymentName.unapply}"
+          )
         )
       )
-    )
-  } yield ()
+    } yield ()
+  }
 
   private def zipDirectory(localBundlePath: File, bundleZipDirPath: Path): File = {
     val outputZipFilePath = s"${bundleZipDirPath.toFile.getPath}/bundle.zip"
